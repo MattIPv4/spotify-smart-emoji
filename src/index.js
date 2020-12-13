@@ -113,7 +113,7 @@ const main = async () => {
             { description: `Automated playlist. Last updated ${(new Date()).toISOString()}` },
         );
 
-        console.log(`${smartData.spotify.smart.playlist.name} updated, added ${toAdd.size.toLocaleString()} tracks, removed ${toRemove.size.toLocaleString()} tracks`);
+        console.log(`${smartData.spotify.smart.playlist.name} updated, now has ${(smartData.spotify.smart.tracks.size + toAdd.size - toRemove.size).toLocaleString()} tracks (added ${toAdd.size.toLocaleString()} tracks, removed ${toRemove.size.toLocaleString()} tracks)`);
     }
 };
 
