@@ -60,8 +60,14 @@ const main = async () => {
     for (const smartData of smart) {
         // Build the initial spotify data
         smartData.spotify = {
-            sources: playlists.filter(playlist => playlist.name.startsWith(`${smartData.emoji} `)
-                && playlist.name !== smartData.playlist).map(playlist => ({ playlist })),
+            sources: playlists.filter(playlist => {
+                if (playlist.name === smartData.playlist) return false;
+
+                if (Array.isArray(smartData.emoji))
+                    return smartData.emoji.some(emoji => playlist.name.startsWith(`${emoji} `));
+
+                return playlist.name.startsWith(`${smartData.emoji} `);
+            }).map(playlist => ({ playlist })),
             smart: {
                 playlist: playlists.find(playlist => playlist.name === smartData.playlist),
             },

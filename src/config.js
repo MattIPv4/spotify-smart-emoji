@@ -14,5 +14,21 @@ module.exports = {
             playlist: '💫 Disney',
             emoji: '💫',
         },
+        {
+            playlist: '🤐 Depresso Expresso',
+            emoji: ['🤐', '🌹', '☠️', '🦅'],
+        },
+        {
+            playlist: '🌹 Emma Blackery',
+            emoji: '🌹',
+        },
+        {
+            playlist: '☠️ MCR',
+            emoji: '☠️',
+        },
+        {
+            playlist: '🦅 TØP',
+            emoji: '🦅',
+        },
     ],
 };
