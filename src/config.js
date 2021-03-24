@@ -12,7 +12,7 @@ module.exports = {
         },
         {
             playlist: '💫 Disney',
-            emoji: '💫',
+            emoji: ['💫', '🧚', '🏰'],
         },
         {
             playlist: '🤐 Depresso Expresso',
