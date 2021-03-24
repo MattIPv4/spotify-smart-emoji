@@ -15,6 +15,14 @@ module.exports = {
             emoji: ['💫', '🧚', '🏰'],
         },
         {
+            playlist: '🧚 Disney Shows & Parades',
+            emoji: '🧚',
+        },
+        {
+            playlist: '🏰 Disney Parks',
+            emoji: '🏰',
+        },
+        {
             playlist: '🤐 Depresso Expresso',
             emoji: ['🤐', '🌹', '☠️', '🦅'],
         },
