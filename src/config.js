@@ -23,7 +23,7 @@ module.exports = {
             emoji: '🏰',
         },
         {
-            playlist: '🤐 Depresso Expresso',
+            playlist: '🤐 Depresso Espresso',
             emoji: ['🤐', '🌹', '☠️', '🦅'],
         },
         {

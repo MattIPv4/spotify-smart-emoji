@@ -54,7 +54,7 @@ const main = async () => {
     const output = document.createElement('code');
     wrapper.appendChild(output);
     document.body.appendChild(wrapper);
-    output.textContent = 'Connecting to Spotify...';
+    output.textContent = '📦 Connecting to Spotify...';
 
     // Create output helper
     const log = msg => {
@@ -67,7 +67,7 @@ const main = async () => {
     spotifyApi.setAccessToken(query.access_token);
 
     // Get all playlists
-    log('Fetching all playlists...');
+    log('📥 Fetching all playlists...');
     const playlists = await allUserPlaylists(spotifyApi);
 
     // Hydrate the playlists data
@@ -89,19 +89,19 @@ const main = async () => {
 
         // Create the smart playlist if needed
         if (!smartData.spotify.smart.playlist) {
-            log(`Creating playlist ${smartData.playlist}...`);
+            log(`🆕 Creating playlist ${smartData.playlist}...`);
             const newPlaylist = await spotifyApi.createPlaylist(smartData.playlist, { public: true });
             smartData.spotify.smart.playlist = newPlaylist.body;
         }
 
         // Get the tracks in the automated playlist
-        log(`Fetching existing tracks for playlist ${smartData.playlist}...`);
+        log(`📥 Fetching existing tracks for playlist ${smartData.playlist}...`);
         const smartTracks = await allPlaylistTracks(spotifyApi, smartData.spotify.smart.playlist.id);
         smartData.spotify.smart.tracks = new Set(smartTracks.map(track => track.track.uri));
 
         // Get the tracks in each source playlist
         for (const smartSource of smartData.spotify.sources) {
-            log(`Fetching source tracks from ${smartSource.playlist.name} for playlist ${smartData.playlist}...`);
+            log(`📥 Fetching source tracks from ${smartSource.playlist.name} for playlist ${smartData.playlist}...`);
             const sourceTracks = await allPlaylistTracks(spotifyApi, smartSource.playlist.id);
             smartSource.tracks = new Set(sourceTracks.map(track => track.track.uri));
         }
@@ -117,13 +117,13 @@ const main = async () => {
 
         // Add the tracks
         if (toAdd.size) {
-            log(`Adding new tracks for playlist ${smartData.playlist}...`);
+            log(`✅ Adding new tracks for playlist ${smartData.playlist}...`);
             await addAllTracks(spotifyApi, smartData.spotify.smart.playlist.id, [...toAdd]);
         }
 
         // Remove the tracks
         if (toRemove.size) {
-            log(`Removing old tracks for playlist ${smartData.playlist}...`);
+            log(`⛔️ Removing old tracks for playlist ${smartData.playlist}...`);
             await spotifyApi.removeTracksFromPlaylist(
                 smartData.spotify.smart.playlist.id,
                 [...toRemove].map(uri => ({ uri })),
@@ -131,18 +131,18 @@ const main = async () => {
         }
 
         // Update the playlist
-        log(`Updating description for playlist ${smartData.playlist}...`);
+        log(`📤 Updating description for playlist ${smartData.playlist}...`);
         await spotifyApi.changePlaylistDetails(
             smartData.spotify.smart.playlist.id,
             { description: `Automated playlist. Last updated ${(new Date()).toISOString()}` },
         );
 
         // Done
-        log(`${smartData.playlist} updated, now has ${(smartData.spotify.smart.tracks.size + toAdd.size - toRemove.size).toLocaleString()} tracks (added ${toAdd.size.toLocaleString()} tracks, removed ${toRemove.size.toLocaleString()} tracks)`);
+        log(`📤 ${smartData.playlist} updated, now has ${(smartData.spotify.smart.tracks.size + toAdd.size - toRemove.size).toLocaleString()} tracks (added ${toAdd.size.toLocaleString()} tracks, removed ${toRemove.size.toLocaleString()} tracks)`);
     }
 
     // Done
-    log('Completed');
+    log('📦 Completed');
 };
 
 main().then();
