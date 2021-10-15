@@ -19,7 +19,7 @@ module.exports = {
             emoji: '🧚',
         },
         {
-            playlist: '🏰 Disney Parks',
+            playlist: '🏰 Disney Parks & Sounds',
             emoji: '🏰',
         },
         {

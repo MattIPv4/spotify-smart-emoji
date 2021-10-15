@@ -70,6 +70,9 @@ const main = async () => {
     log('📥 Fetching all playlists...');
     const playlists = await allUserPlaylists(spotifyApi);
 
+    // Create a global cache of playlist tracks
+    const tracksCache = new Map();
+
     // Hydrate the playlists data
     for (const smartData of smart) {
         // Build the initial spotify data
@@ -95,15 +98,27 @@ const main = async () => {
         }
 
         // Get the tracks in the automated playlist
-        log(`📥 Fetching existing tracks for playlist ${smartData.playlist}...`);
-        const smartTracks = await allPlaylistTracks(spotifyApi, smartData.spotify.smart.playlist.id);
-        smartData.spotify.smart.tracks = new Set(smartTracks.map(track => track.track.uri));
+        if (tracksCache.has(smartData.spotify.smart.playlist.id)) {
+            log(`📥 Using cached existing tracks for playlist ${smartData.playlist}...`);
+            smartData.spotify.smart.tracks = tracksCache.get(smartData.spotify.smart.playlist.id);
+        } else {
+            log(`📥 Fetching existing tracks for playlist ${smartData.playlist}...`);
+            const smartTracks = await allPlaylistTracks(spotifyApi, smartData.spotify.smart.playlist.id);
+            smartData.spotify.smart.tracks = new Set(smartTracks.map(track => track.track.uri));
+            tracksCache.set(smartData.spotify.smart.playlist.id, smartData.spotify.smart.tracks);
+        }
 
         // Get the tracks in each source playlist
         for (const smartSource of smartData.spotify.sources) {
-            log(`📥 Fetching source tracks from ${smartSource.playlist.name} for playlist ${smartData.playlist}...`);
-            const sourceTracks = await allPlaylistTracks(spotifyApi, smartSource.playlist.id);
-            smartSource.tracks = new Set(sourceTracks.map(track => track.track.uri));
+            if (tracksCache.has(smartSource.playlist.id)) {
+                log(`📥 Using cached source tracks from ${smartSource.playlist.name} for playlist ${smartData.playlist}...`);
+                smartSource.tracks = tracksCache.get(smartSource.playlist.id);
+            } else {
+                log(`📥 Fetching source tracks from ${smartSource.playlist.name} for playlist ${smartData.playlist}...`);
+                const sourceTracks = await allPlaylistTracks(spotifyApi, smartSource.playlist.id);
+                smartSource.tracks = new Set(sourceTracks.map(track => track.track.uri));
+                tracksCache.set(smartSource.playlist.id, smartSource.tracks);
+            }
         }
     }
 
