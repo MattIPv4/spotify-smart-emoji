@@ -38,5 +38,9 @@ module.exports = {
             playlist: '🦅 TØP',
             emoji: '🦅',
         },
+        {
+            playlist: '🎙 Twitch',
+            emoji: '🎙',
+        },
     ],
 };
