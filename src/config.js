@@ -8,18 +8,22 @@ module.exports = {
     smart: [
         {
             playlist: '🎭 Musicals',
+            description: 'Mega-collection of tracks from all the musicals (ish).',
             emoji: '🎭',
         },
         {
             playlist: '💫 Disney',
+            description: 'Mega-collection of all things Disney (movies, shows, parks, etc.).',
             emoji: ['💫', '🪄', '🧚', '🏰'],
         },
         {
             playlist: '🧚 Disney Shows & Parades',
+            description: 'Tracks used in Disney shows and parades at the parks.',
             emoji: '🧚',
         },
         {
             playlist: '🏰 Disney Parks & Sounds',
+            description: 'Tracks heard around the Disney parks (or relating to the parks).',
             emoji: '🏰',
         },
         {
@@ -40,6 +44,7 @@ module.exports = {
         },
         {
             playlist: '🎙 Twitch',
+            description: 'Mega-collection of songs from the Twitch world.',
             emoji: '🎙',
         },
     ],

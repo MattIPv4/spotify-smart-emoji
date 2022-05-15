@@ -147,9 +147,18 @@ const main = async () => {
 
         // Update the playlist
         log(`📤 Updating description for playlist ${smartData.playlist}...`);
+        const emojiList = Array.isArray(smartData.emoji)
+            ? smartData.emoji.length === 1
+                ? smartData.emoji[0]
+                : `${smartData.emoji.slice(0, -1).join(', ')} or ${smartData.emoji.slice(-1)[0]}`
+            : smartData.emoji;
         await spotifyApi.changePlaylistDetails(
             smartData.spotify.smart.playlist.id,
-            { description: `Automated playlist. Last updated ${(new Date()).toISOString()}` },
+            { description: [
+                smartData.description,
+                `Automatically generated from playlists starting with ${emojiList}.`,
+                `Last updated ${(new Date()).toISOString()}`,
+            ].filter(Boolean).join(' ') },
         );
 
         // Done
