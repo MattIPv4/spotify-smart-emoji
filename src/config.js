@@ -28,7 +28,7 @@ module.exports = {
         },
         {
             playlist: '🤐 Depresso Espresso',
-            emoji: ['🤐', '🌹', '☠️', '🦅'],
+            emoji: ['🤐', '🛰', '🌹', '☠️', '🦅'],
         },
         {
             playlist: '🌹 Emma Blackery',
