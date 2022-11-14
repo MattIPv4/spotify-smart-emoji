@@ -47,5 +47,9 @@ export default {
             description: 'Mega-collection of songs from the Twitch world.',
             emoji: '🎙',
         },
+        {
+            playlist: '🎄 Christmas',
+            emoji: ['🎄', '🔨'],
+        },
     ],
 };
