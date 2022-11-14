@@ -1,13 +1,10 @@
-const qs = require('qs');
-const { clientId, scopes } = require('./config');
+import config from './config.js';
 
-module.exports = () => {
-    const query = qs.stringify({
-        client_id: clientId,
-        response_type: 'token',
-        redirect_uri: window.location.origin,
-        scope: scopes.join(' '),
-    });
-
-    return `https://accounts.spotify.com/authorize?${query}`;
+export default () => {
+    const query = new URL('https://accounts.spotify.com/authorize');
+    query.searchParams.set('client_id', config.clientId);
+    query.searchParams.set('response_type', 'token');
+    query.searchParams.set('redirect_uri', window.location.href.replace(/\/$/, ''));
+    query.searchParams.set('scope', config.scopes.join(' '));
+    return query.href;
 };

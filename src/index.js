@@ -1,18 +1,15 @@
-require('regenerator-runtime/runtime'); // Thanks Parcel
+import SpotifyWebApi from 'spotify-web-api-js';
+import auth from './auth.js';
+import config from './config.js';
 
-const qs = require('qs');
-const SpotifyWebApi = require('spotify-web-api-node');
-const auth = require('./auth');
-const { smart } = require('./config');
-
-const allUserPlaylists = async api => {
+const allUserPlaylists = async (api, user) => {
     const data = [];
     let offset = 0;
 
     while (true) {
-        const res = await api.getUserPlaylists(undefined, { offset });
-        data.push(...res.body.items);
-        if (res.body.next) offset += res.body.limit;
+        const res = await api.getUserPlaylists(user.id, { offset, limit: 50 });
+        data.push(...res.items);
+        if (res.next) offset += res.items.length;
         else break;
     }
 
@@ -24,9 +21,9 @@ const allPlaylistTracks = async (api, playlist) => {
     let offset = 0;
 
     while (true) {
-        const res = await api.getPlaylistTracks(playlist, { offset });
-        data.push(...res.body.items);
-        if (res.body.next) offset += res.body.limit;
+        const res = await api.getPlaylistTracks(playlist, { offset, limit: 50 });
+        data.push(...res.items);
+        if (res.next) offset += res.items.length;
         else break;
     }
 
@@ -43,11 +40,10 @@ const addAllTracks = async (api, playlist, tracks) => {
 };
 
 const main = async () => {
-    const rawQuery = window.location.hash && window.location.hash.slice(1);
-    const query = qs.parse(rawQuery);
+    const query = new URLSearchParams(window.location.hash.slice(1));
 
     // If no access token present, auth
-    if (!query || !query.access_token) return window.location.href = auth();
+    if (!query.has('access_token')) return window.location.href = auth();
 
     // Create HTML output
     const wrapper = document.createElement('pre');
@@ -64,17 +60,20 @@ const main = async () => {
 
     // Create API client
     const spotifyApi = new SpotifyWebApi();
-    spotifyApi.setAccessToken(query.access_token);
+    spotifyApi.setAccessToken(query.get('access_token'));
+
+    // Get user info
+    const spotifyUser = await spotifyApi.getMe();
 
     // Get all playlists
     log('📥 Fetching all playlists...');
-    const playlists = await allUserPlaylists(spotifyApi);
+    const playlists = await allUserPlaylists(spotifyApi, spotifyUser);
 
     // Create a global cache of playlist tracks
     const tracksCache = new Map();
 
     // Hydrate the playlists data
-    for (const smartData of smart) {
+    for (const smartData of config.smart) {
         // Build the initial spotify data
         smartData.spotify = {
             sources: playlists.filter(playlist => {
@@ -93,8 +92,7 @@ const main = async () => {
         // Create the smart playlist if needed
         if (!smartData.spotify.smart.playlist) {
             log(`🆕 Creating playlist ${smartData.playlist}...`);
-            const newPlaylist = await spotifyApi.createPlaylist(smartData.playlist, { public: true });
-            smartData.spotify.smart.playlist = newPlaylist.body;
+            smartData.spotify.smart.playlist = await spotifyApi.createPlaylist(spotifyUser.id, { name: smartData.playlist, public: true });
         }
 
         // Get the tracks in the automated playlist
@@ -123,7 +121,7 @@ const main = async () => {
     }
 
     // Update the playlists
-    for (const smartData of smart) {
+    for (const smartData of config.smart) {
         // Establish which tracks to add and remove
         const allSourceTracks = new Set();
         smartData.spotify.sources.forEach(source => source.tracks.forEach(track => allSourceTracks.add(track)));

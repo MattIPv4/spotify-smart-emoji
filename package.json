@@ -2,19 +2,17 @@
   "name": "spotify-smart-emoji",
   "version": "1.0.0",
   "description": "",
+  "private": true,
   "main": "src/index.js",
   "scripts": {
-    "start": "parcel serve src/index.html"
+    "start": "parcel src/index.html"
   },
-  "author": "",
+  "author": "Matt (IPv4) Cowley",
   "license": "ISC",
   "dependencies": {
-    "qs": "^6.9.4",
-    "regenerator-runtime": "^0.13.7",
-    "spotify-web-api-js": "^1.5.1",
-    "spotify-web-api-node": "^5.0.0"
+    "spotify-web-api-js": "^1.5.2"
   },
   "devDependencies": {
-    "parcel-bundler": "^1.12.4"
+    "parcel": "^2.8.0"
   }
 }
