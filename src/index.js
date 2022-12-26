@@ -2,6 +2,37 @@ import SpotifyWebApi from 'spotify-web-api-js';
 import auth from './auth.js';
 import config from './config.js';
 
+const actions = {
+    connection: {
+        emoji: '📦',
+        color: [ 172, 146, 236 ], // Purple
+    },
+    download: {
+        emoji: '📥',
+        color: [ 255, 206, 84 ], // Yellow
+    },
+    upload: {
+        emoji: '📤',
+        color: [ 160, 212, 104 ], // Green
+    },
+    cache: {
+        emoji: '📂',
+        color: [ 93, 156, 236 ], // Blue
+    },
+    new: {
+        emoji: '🆕',
+        color: [ 236, 135, 192 ], // Pink
+    },
+    add: {
+        emoji: '✅',
+        color: [ 72, 207, 173 ], // Mint
+    },
+    remove: {
+        emoji: '❌',
+        color: [ 237, 85, 101 ], // Red
+    },
+};
+
 const allUserPlaylists = async (api, user) => {
     const data = [];
     let offset = 0;
@@ -31,7 +62,7 @@ const allPlaylistTracks = async (api, playlist) => {
 };
 
 const addAllTracks = async (api, playlist, tracks) => {
-    const remainingTracks = [...tracks];
+    const remainingTracks = [ ...tracks ];
 
     while (remainingTracks.length) {
         const addTracks = remainingTracks.splice(0, 100);
@@ -50,15 +81,18 @@ const main = async () => {
     const output = document.createElement('code');
     wrapper.appendChild(output);
     document.body.appendChild(wrapper);
-    output.textContent = '📦 Connecting to Spotify...';
 
     // Create output helper
-    const log = msg => {
-        output.textContent += `\n${msg}`;
+    const log = (action, msg) => {
+        const div = document.createElement('div');
+        div.style.backgroundColor = `rgba(${action.color.join(', ')}, 0.4)`;
+        div.textContent = `${action.emoji} ${msg}`;
+        output.appendChild(div);
         document.body.scrollTop = document.body.scrollHeight;
     };
 
     // Create API client
+    log(actions.connection, 'Connecting to Spotify...');
     const spotifyApi = new SpotifyWebApi();
     spotifyApi.setAccessToken(query.get('access_token'));
 
@@ -66,7 +100,7 @@ const main = async () => {
     const spotifyUser = await spotifyApi.getMe();
 
     // Get all playlists
-    log('📥 Fetching all playlists...');
+    log(actions.download, 'Fetching all playlists...');
     const playlists = await allUserPlaylists(spotifyApi, spotifyUser);
 
     // Create a global cache of playlist tracks
@@ -91,16 +125,16 @@ const main = async () => {
 
         // Create the smart playlist if needed
         if (!smartData.spotify.smart.playlist) {
-            log(`🆕 Creating playlist ${smartData.playlist}...`);
+            log(actions.new, `Creating playlist ${smartData.playlist}...`);
             smartData.spotify.smart.playlist = await spotifyApi.createPlaylist(spotifyUser.id, { name: smartData.playlist, public: true });
         }
 
         // Get the tracks in the automated playlist
         if (tracksCache.has(smartData.spotify.smart.playlist.id)) {
-            log(`📥 Using cached existing tracks for playlist ${smartData.playlist}...`);
+            log(actions.cache, `Using cached existing tracks for playlist ${smartData.playlist}...`);
             smartData.spotify.smart.tracks = tracksCache.get(smartData.spotify.smart.playlist.id);
         } else {
-            log(`📥 Fetching existing tracks for playlist ${smartData.playlist}...`);
+            log(actions.download, `Fetching existing tracks for playlist ${smartData.playlist}...`);
             const smartTracks = await allPlaylistTracks(spotifyApi, smartData.spotify.smart.playlist.id);
             smartData.spotify.smart.tracks = new Set(smartTracks.map(track => track.track.uri));
             tracksCache.set(smartData.spotify.smart.playlist.id, smartData.spotify.smart.tracks);
@@ -109,10 +143,10 @@ const main = async () => {
         // Get the tracks in each source playlist
         for (const smartSource of smartData.spotify.sources) {
             if (tracksCache.has(smartSource.playlist.id)) {
-                log(`📥 Using cached source tracks from ${smartSource.playlist.name} for playlist ${smartData.playlist}...`);
+                log(actions.cache, `Using cached source tracks from ${smartSource.playlist.name} for playlist ${smartData.playlist}...`);
                 smartSource.tracks = tracksCache.get(smartSource.playlist.id);
             } else {
-                log(`📥 Fetching source tracks from ${smartSource.playlist.name} for playlist ${smartData.playlist}...`);
+                log(actions.download, `Fetching source tracks from ${smartSource.playlist.name} for playlist ${smartData.playlist}...`);
                 const sourceTracks = await allPlaylistTracks(spotifyApi, smartSource.playlist.id);
                 smartSource.tracks = new Set(sourceTracks.map(track => track.track.uri));
                 tracksCache.set(smartSource.playlist.id, smartSource.tracks);
@@ -125,26 +159,26 @@ const main = async () => {
         // Establish which tracks to add and remove
         const allSourceTracks = new Set();
         smartData.spotify.sources.forEach(source => source.tracks.forEach(track => allSourceTracks.add(track)));
-        const toAdd = new Set([...allSourceTracks].filter(track => !smartData.spotify.smart.tracks.has(track)));
-        const toRemove = new Set([...smartData.spotify.smart.tracks].filter(track => !allSourceTracks.has(track)));
+        const toAdd = new Set([ ...allSourceTracks ].filter(track => !smartData.spotify.smart.tracks.has(track)));
+        const toRemove = new Set([ ...smartData.spotify.smart.tracks ].filter(track => !allSourceTracks.has(track)));
 
         // Add the tracks
         if (toAdd.size) {
-            log(`✅ Adding new tracks for playlist ${smartData.playlist}...`);
-            await addAllTracks(spotifyApi, smartData.spotify.smart.playlist.id, [...toAdd]);
+            log(actions.add, `Adding new tracks for playlist ${smartData.playlist}...`);
+            await addAllTracks(spotifyApi, smartData.spotify.smart.playlist.id, [ ...toAdd ]);
         }
 
         // Remove the tracks
         if (toRemove.size) {
-            log(`⛔️ Removing old tracks for playlist ${smartData.playlist}...`);
+            log(actions.remove, `Removing old tracks for playlist ${smartData.playlist}...`);
             await spotifyApi.removeTracksFromPlaylist(
                 smartData.spotify.smart.playlist.id,
-                [...toRemove].map(uri => ({ uri })),
+                [ ...toRemove ].map(uri => ({ uri })),
             );
         }
 
         // Update the playlist
-        log(`📤 Updating description for playlist ${smartData.playlist}...`);
+        log(actions.upload, `Updating description for playlist ${smartData.playlist}...`);
         const emojiList = Array.isArray(smartData.emoji)
             ? smartData.emoji.length === 1
                 ? smartData.emoji[0]
@@ -160,11 +194,11 @@ const main = async () => {
         );
 
         // Done
-        log(`📤 ${smartData.playlist} updated, now has ${(smartData.spotify.smart.tracks.size + toAdd.size - toRemove.size).toLocaleString()} tracks (added ${toAdd.size.toLocaleString()} tracks, removed ${toRemove.size.toLocaleString()} tracks)`);
+        log(actions.upload, `${smartData.playlist} updated, now has ${(smartData.spotify.smart.tracks.size + toAdd.size - toRemove.size).toLocaleString()} tracks (added ${toAdd.size.toLocaleString()} tracks, removed ${toRemove.size.toLocaleString()} tracks)`);
     }
 
     // Done
-    log('📦 Completed');
+    log(actions.connection, 'Completed');
 };
 
 main().then();
