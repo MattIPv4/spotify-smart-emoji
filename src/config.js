@@ -28,7 +28,11 @@ export default {
         },
         {
             playlist: '🤐 Depresso Espresso',
-            emoji: ['🤐', '🛰', '🌹', '☠️', '🦅'],
+            emoji: ['🤐', '🛰', '🍬', '🌹', '☠️', '🦅'],
+        },
+        {
+            playlist: '🍬 Olivia Rodrigo',
+            emoji: '🍬',
         },
         {
             playlist: '🌹 Emma Blackery',
