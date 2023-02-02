@@ -14,7 +14,7 @@ export default {
         {
             playlist: '💫 Disney',
             description: 'Mega-collection of all things Disney (movies, shows, parks, etc.).',
-            emoji: ['💫', '🪄', '🧚', '🏰'],
+            emoji: ['💫', '🪄', '🧚', '🏰', '🎬'],
         },
         {
             playlist: '🧚 Disney Shows & Parades',
@@ -25,6 +25,11 @@ export default {
             playlist: '🏰 Disney Parks & Sounds',
             description: 'Tracks heard around the Disney parks (or relating to the parks).',
             emoji: '🏰',
+        },
+        {
+            playlist: '🎬 HSMTMTS',
+            description: 'Soundtracks from Disney+ High School Musical: The Musical: The Series',
+            emoji: '🎬',
         },
         {
             playlist: '🤐 Depresso Espresso',
