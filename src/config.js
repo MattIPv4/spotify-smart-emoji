@@ -61,4 +61,11 @@ export default {
             emoji: ['🎄', '🔨'],
         },
     ],
+    sync: {
+        ignore: [
+            '🎙 ERA',
+            '🎙 Mitch Jones',
+            '🎙 Sordiway',
+        ],
+    },
 };
