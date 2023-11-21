@@ -13,6 +13,6 @@
     "spotify-web-api-js": "^1.5.2"
   },
   "devDependencies": {
-    "parcel": "^2.8.2"
+    "parcel": "^2.10.3"
   }
 }
