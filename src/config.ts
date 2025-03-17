@@ -1,4 +1,19 @@
-export default {
+export interface SmartPlaylist {
+    playlist: string;
+    description?: string;
+    emoji: string | string[];
+}
+
+interface SmartConfig {
+    clientId: string;
+    scopes: string[];
+    smart: SmartPlaylist[];
+    sync?: {
+        ignore: string[];
+    };
+}
+
+const config: SmartConfig = {
     clientId: '220a2f9321f04d0ba2633276c1c18de0',
     scopes: [
         'playlist-modify-public',
@@ -69,3 +84,5 @@ export default {
         ],
     },
 };
+
+export default config;

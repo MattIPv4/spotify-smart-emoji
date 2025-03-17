@@ -6,5 +6,5 @@ export default () => {
     query.searchParams.set('response_type', 'token');
     query.searchParams.set('redirect_uri', window.location.href.replace(/\/$/, ''));
     query.searchParams.set('scope', config.scopes.join(' '));
-    return query.href;
+    return query.toString();
 };

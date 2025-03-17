@@ -1,6 +1,22 @@
 import SpotifyWebApi from 'spotify-web-api-js';
-import auth from './auth.js';
-import config from './config.js';
+import auth from './auth.ts';
+import config, { type SmartPlaylist } from './config.ts';
+
+interface SmartPlaylistHydrated extends SmartPlaylist {
+    spotify: {
+        sources: string[];
+        smart: string;
+    };
+}
+
+interface PlaylistWithTracks extends Omit<SpotifyApi.PlaylistObjectSimplified, 'tracks'> {
+    tracks?: (SpotifyApi.TrackObjectFull | SpotifyApi.TrackObjectSimplified)[];
+}
+
+interface Action {
+    emoji: string;
+    color: [number, number, number];
+}
 
 const actions = {
     connection: {
@@ -35,10 +51,10 @@ const actions = {
         emoji: '⏩️',
         color: [ 67, 74, 84 ], // Grey
     },
-};
+} as const satisfies Record<string, Action>;
 
-const allUserPlaylists = async (api, user) => {
-    const data = [];
+const allUserPlaylists = async (api: SpotifyWebApi.SpotifyWebApiJs, user: SpotifyApi.CurrentUsersProfileResponse) => {
+    const data: SpotifyApi.PlaylistObjectSimplified[] = [];
     let offset = 0;
 
     while (true) {
@@ -51,13 +67,13 @@ const allUserPlaylists = async (api, user) => {
     return data;
 };
 
-const allPlaylistTracks = async (api, playlist) => {
-    const data = [];
+const allPlaylistTracks = async (api: SpotifyWebApi.SpotifyWebApiJs, playlist: string) => {
+    const data: SpotifyApi.TrackObjectFull[] = [];
     let offset = 0;
 
     while (true) {
         const res = await api.getPlaylistTracks(playlist, { offset, limit: 50 });
-        data.push(...res.items);
+        data.push(...res.items.map(item => item.track).filter((item): item is SpotifyApi.TrackObjectFull => item.type === 'track'))
         if (res.next) offset += res.items.length;
         else break;
     }
@@ -65,8 +81,8 @@ const allPlaylistTracks = async (api, playlist) => {
     return data;
 };
 
-const allAlbumTracks = async (api, album) => {
-    const data = [];
+const allAlbumTracks = async (api: SpotifyWebApi.SpotifyWebApiJs, album: string) => {
+    const data: SpotifyApi.TrackObjectSimplified[] = [];
     let offset = 0;
 
     while (true) {
@@ -79,7 +95,7 @@ const allAlbumTracks = async (api, album) => {
     return data;
 };
 
-const addAllTracks = async (api, playlist, tracks) => {
+const addAllTracks = async (api: SpotifyWebApi.SpotifyWebApiJs, playlist: string, tracks: string[]) => {
     const remainingTracks = [ ...tracks ];
 
     while (remainingTracks.length) {
@@ -88,7 +104,7 @@ const addAllTracks = async (api, playlist, tracks) => {
     }
 };
 
-const removeAllTracks = async (api, playlist, tracks) => {
+const removeAllTracks = async (api: SpotifyWebApi.SpotifyWebApiJs, playlist: string, tracks: string[]) => {
     const remainingTracks = [ ...tracks ];
 
     while (remainingTracks.length) {
@@ -110,7 +126,7 @@ const main = async () => {
     document.body.appendChild(wrapper);
 
     // Create output helper
-    const log = (action, msg) => {
+    const log = (action: Action, msg: string) => {
         const div = document.createElement('div');
         div.style.backgroundColor = `rgba(${action.color.join(', ')}, 0.4)`;
         div.textContent = `${action.emoji} ${msg}`;
@@ -128,13 +144,16 @@ const main = async () => {
 
     // Get all playlists
     log(actions.download, 'Fetching all playlists...');
-    const playlists = new Map((await allUserPlaylists(spotifyApi, spotifyUser)).map(playlist => [ playlist.id, { ...playlist, tracks: null } ]));
-    const sources = new Set();
+    const playlists = new Map<string, PlaylistWithTracks>((await allUserPlaylists(spotifyApi, spotifyUser)).map(playlist => [ playlist.id, { ...playlist, tracks: undefined } ]));
+
+    // Track all the playlists that are sources for smart playlists
+    const sources = new Set<string>();
 
     // Hydrate the playlists data
+    const smartPlaylists: SmartPlaylistHydrated[] = [];
     for (const smartData of config.smart) {
         // Build the initial spotify data
-        smartData.spotify = {
+        const spotifyData = {
             // Array of playlist IDs that are sources for this smart playlist
             sources: [ ...playlists.values() ].filter(playlist => {
                 if (playlist.name === smartData.playlist) return false;
@@ -149,28 +168,28 @@ const main = async () => {
         };
 
         // Store all the source playlists, so we can do album syncing
-        smartData.spotify.sources.forEach(source => sources.add(source));
+        spotifyData.sources.forEach(source => sources.add(source));
 
         // Create the smart playlist if needed
-        if (!smartData.spotify.smart) {
+        if (!spotifyData.smart) {
             log(actions.new, `Creating playlist ${smartData.playlist}...`);
             const playlist = await spotifyApi.createPlaylist(spotifyUser.id, { name: smartData.playlist, public: true });
-            playlists.set(playlist.id, { ...playlist, tracks: null });
-            smartData.spotify.smart = playlist.id;
+            playlists.set(playlist.id, { ...playlist, tracks: undefined });
+            spotifyData.smart = playlist.id;
         }
 
         // Get the tracks in the automated playlist
-        const playlist = playlists.get(smartData.spotify.smart);
+        const playlist = playlists.get(spotifyData.smart)!;
         if (playlist.tracks) {
             log(actions.cache, `Using cached existing tracks for playlist ${smartData.playlist}...`);
         } else {
             log(actions.download, `Fetching existing tracks for playlist ${smartData.playlist}...`);
-            playlist.tracks = await allPlaylistTracks(spotifyApi, smartData.spotify.smart);
+            playlist.tracks = await allPlaylistTracks(spotifyApi, spotifyData.smart);
         }
 
         // Get the tracks in each source playlist
-        for (const smartSource of smartData.spotify.sources) {
-            const sourcePlaylist = playlists.get(smartSource);
+        for (const smartSource of spotifyData.sources) {
+            const sourcePlaylist = playlists.get(smartSource)!;
             if (sourcePlaylist.tracks) {
                 log(actions.cache, `Using cached source tracks from ${sourcePlaylist.name} for playlist ${smartData.playlist}...`);
             } else {
@@ -178,13 +197,20 @@ const main = async () => {
                 sourcePlaylist.tracks = await allPlaylistTracks(spotifyApi, smartSource);
             }
         }
+
+        // Store the hydrated data (cast type as TS can't tell we set the id if its undefined)
+        smartPlaylists.push({ ...smartData, spotify: spotifyData as SmartPlaylistHydrated['spotify'] });
     }
 
     // Update the source playlists
     if (config.sync) {
-        const albums = new Map();
+        const albums = new Map<string, SpotifyApi.TrackObjectSimplified[]>();
         for (const playlistId of sources) {
             const playlist = playlists.get(playlistId);
+            if (!playlist || !playlist.tracks) {
+                log(actions.skip, `Skipping album sync for playlist ${playlist?.name || playlistId}... no tracks`);
+                continue;
+            }
 
             // If the playlist should be ignored, skip
             if (config.sync.ignore.includes(playlist.name)) {
@@ -193,28 +219,30 @@ const main = async () => {
             }
 
             // If the album for all the tracks isn't the same, skip
-            const album = playlist.tracks[0].track.album;
-            if (playlist.tracks.some(track => track.track.album.id !== album.id)) {
+            const album = 'album' in playlist.tracks[0] && playlist.tracks[0].album;
+            if (!album || playlist.tracks.some(track => !('album' in track) || track.album.id !== album.id)) {
                 log(actions.skip, `Skipping album sync for playlist ${playlist.name}... contains multiple albums`);
                 continue;
             }
 
             // Get the tracks on the album
-            if (albums.has(album.id)) {
+            let albumTracks = albums.get(album.id);
+            if (albumTracks) {
                 log(actions.cache, `Using cached album tracks from ${album.name} for playlist ${playlist.name}...`);
             } else {
                 log(actions.download, `Fetching album tracks from ${album.name} for playlist ${playlist.name}...`);
-                albums.set(album.id, await allAlbumTracks(spotifyApi, album.id));
+                albumTracks = await allAlbumTracks(spotifyApi, album.id);
+                albums.set(album.id, albumTracks);
             }
 
             // Track if we made any changes
             let changed = false;
 
             // Get the tracks to add and remove
-            const albumTracks = new Set(albums.get(album.id).map(track => track.uri));
-            const playlistTracks = new Set(playlist.tracks.map(track => track.track.uri));
-            const toAdd = albums.get(album.id).filter(track => !playlistTracks.has(track.uri));
-            const toRemove = playlist.tracks.filter(track => !albumTracks.has(track.track.uri));
+            const albumTrackUris = new Set(albumTracks.map(track => track.uri));
+            const playlistTrackUris = new Set(playlist.tracks.map(track => track.uri) ?? []);
+            const toAdd = albumTracks.filter(track => !playlistTrackUris.has(track.uri));
+            const toRemove = playlist.tracks.filter(track => !albumTrackUris.has(track.uri)) ?? [];
 
             // Update the playlist if needed
             if (toAdd.length || toRemove.length) {
@@ -227,13 +255,13 @@ const main = async () => {
                 // Remove the tracks
                 if (toRemove.length) {
                     log(actions.remove, `Removing old tracks from playlist ${playlist.name}...`);
-                    await removeAllTracks(spotifyApi, playlistId, [ ...new Set(toRemove.map(track => track.track.uri)) ]);
+                    await removeAllTracks(spotifyApi, playlistId, [ ...new Set(toRemove.map(track => track.uri)) ]);
                 }
 
                 // Ensure the playlist cache has the correct tracks
                 playlist.tracks = [
-                    ...playlist.tracks.filter(track => !toRemove.some(toRemoveTrack => toRemoveTrack.track.uri === track.track.uri)),
-                    ...toAdd.map(track => ({track})),
+                    ...playlist.tracks?.filter(track => !toRemove.some(toRemoveTrack => toRemoveTrack.uri === track.uri)) ?? [],
+                    ...toAdd,
                 ];
 
                 // Done
@@ -242,13 +270,13 @@ const main = async () => {
             }
 
             // Ensure the playlists are in the correct order
-            const expectedOrder = [ ...albumTracks ];
-            if (expectedOrder.some((uri, i) => playlist.tracks[i].track.uri !== uri)) {
+            const expectedOrder = [ ...albumTrackUris ];
+            if (expectedOrder.some((uri, i) => playlist.tracks?.[i]?.uri !== uri)) {
                 for (let i = 0; i < expectedOrder.length; i++) {
-                    if (playlist.tracks[i].track.uri === expectedOrder[i]) continue;
+                    if (playlist.tracks[i].uri === expectedOrder[i]) continue;
 
                     // Get the current position of this track
-                    const current = playlist.tracks.findIndex(track => track.track.uri === expectedOrder[i]);
+                    const current = playlist.tracks.findIndex(track => track.uri === expectedOrder[i]);
 
                     // Move this track to the correct position
                     await spotifyApi.reorderTracksInPlaylist(playlistId, current, i, { range_length: 1 });
@@ -275,15 +303,19 @@ const main = async () => {
     }
 
     // Update the smart playlists
-    for (const smartData of config.smart) {
+    for (const smartData of smartPlaylists) {
         const playlist = playlists.get(smartData.spotify.smart);
+        if (!playlist || !playlist.tracks) {
+            log(actions.skip, `Skipping smart playlist sync for playlist ${smartData.playlist}... no tracks`);
+            continue;
+        }
 
         // Get all the tracks that should be in the smart playlist
-        const allSourceTracks = new Set();
-        smartData.spotify.sources.forEach(source => playlists.get(source).tracks.forEach(track => allSourceTracks.add(track.track.uri)));
+        const allSourceTracks = new Set<string>();
+        smartData.spotify.sources.forEach(source => playlists.get(source)?.tracks?.forEach(track => allSourceTracks.add(track.uri)));
 
         // Get the tracks to add and remove
-        const currentTracks = new Set(playlist.tracks.map(track => track.track.uri));
+        const currentTracks = new Set(playlist.tracks.map(track => track.uri));
         const toAdd = new Set([ ...allSourceTracks ].filter(track => !currentTracks.has(track)));
         const toRemove = new Set([ ...currentTracks ].filter(track => !allSourceTracks.has(track)));
 
@@ -331,4 +363,3 @@ const main = async () => {
 };
 
 main().then();
-
