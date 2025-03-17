@@ -1,6 +1,7 @@
-import SpotifyWebApi from 'spotify-web-api-js';
+import { addAllTracks, allAlbumTracks, allPlaylistTracks, allUserPlaylists, getApi, removeAllTracks } from './api.ts';
 import auth from './auth.ts';
 import config, { type SmartPlaylist } from './config.ts';
+import log from './log.ts';
 
 interface SmartPlaylistHydrated extends SmartPlaylist {
     spotify: {
@@ -13,137 +14,23 @@ interface PlaylistWithTracks extends Omit<SpotifyApi.PlaylistObjectSimplified, '
     tracks?: (SpotifyApi.TrackObjectFull | SpotifyApi.TrackObjectSimplified)[];
 }
 
-interface Action {
-    emoji: string;
-    color: [number, number, number];
-}
-
-const actions = {
-    connection: {
-        emoji: '📦',
-        color: [ 172, 146, 236 ], // Purple
-    },
-    download: {
-        emoji: '📥',
-        color: [ 255, 206, 84 ], // Yellow
-    },
-    upload: {
-        emoji: '📤',
-        color: [ 160, 212, 104 ], // Green
-    },
-    cache: {
-        emoji: '📂',
-        color: [ 93, 156, 236 ], // Blue
-    },
-    new: {
-        emoji: '🆕',
-        color: [ 236, 135, 192 ], // Pink
-    },
-    add: {
-        emoji: '✅',
-        color: [ 72, 207, 173 ], // Mint
-    },
-    remove: {
-        emoji: '❌',
-        color: [ 237, 85, 101 ], // Red
-    },
-    skip: {
-        emoji: '⏩️',
-        color: [ 67, 74, 84 ], // Grey
-    },
-} as const satisfies Record<string, Action>;
-
-const allUserPlaylists = async (api: SpotifyWebApi.SpotifyWebApiJs, user: SpotifyApi.CurrentUsersProfileResponse) => {
-    const data: SpotifyApi.PlaylistObjectSimplified[] = [];
-    let offset = 0;
-
-    while (true) {
-        const res = await api.getUserPlaylists(user.id, { offset, limit: 50 });
-        data.push(...res.items);
-        if (res.next) offset += res.items.length;
-        else break;
-    }
-
-    return data;
-};
-
-const allPlaylistTracks = async (api: SpotifyWebApi.SpotifyWebApiJs, playlist: string) => {
-    const data: SpotifyApi.TrackObjectFull[] = [];
-    let offset = 0;
-
-    while (true) {
-        const res = await api.getPlaylistTracks(playlist, { offset, limit: 50 });
-        data.push(...res.items.map(item => item.track).filter((item): item is SpotifyApi.TrackObjectFull => item.type === 'track'))
-        if (res.next) offset += res.items.length;
-        else break;
-    }
-
-    return data;
-};
-
-const allAlbumTracks = async (api: SpotifyWebApi.SpotifyWebApiJs, album: string) => {
-    const data: SpotifyApi.TrackObjectSimplified[] = [];
-    let offset = 0;
-
-    while (true) {
-        const res = await api.getAlbumTracks(album, { offset, limit: 50 });
-        data.push(...res.items);
-        if (res.next) offset += res.items.length;
-        else break;
-    }
-
-    return data;
-};
-
-const addAllTracks = async (api: SpotifyWebApi.SpotifyWebApiJs, playlist: string, tracks: string[]) => {
-    const remainingTracks = [ ...tracks ];
-
-    while (remainingTracks.length) {
-        const addTracks = remainingTracks.splice(0, 100);
-        await api.addTracksToPlaylist(playlist, addTracks);
-    }
-};
-
-const removeAllTracks = async (api: SpotifyWebApi.SpotifyWebApiJs, playlist: string, tracks: string[]) => {
-    const remainingTracks = [ ...tracks ];
-
-    while (remainingTracks.length) {
-        const removeTracks = remainingTracks.splice(0, 100);
-        await api.removeTracksFromPlaylist(playlist, removeTracks);
-    }
-};
-
 const main = async () => {
     const query = new URLSearchParams(window.location.hash.slice(1));
 
     // If no access token present, auth
-    if (!query.has('access_token')) return window.location.href = auth();
+    const token = query.get('access_token');
+    if (!token) return window.location.href = auth();
 
-    // Create HTML output
-    const wrapper = document.createElement('pre');
-    const output = document.createElement('code');
-    wrapper.appendChild(output);
-    document.body.appendChild(wrapper);
-
-    // Create output helper
-    const log = (action: Action, msg: string) => {
-        const div = document.createElement('div');
-        div.style.backgroundColor = `rgba(${action.color.join(', ')}, 0.4)`;
-        div.textContent = `${action.emoji} ${msg}`;
-        output.appendChild(div);
-        document.body.scrollTop = document.body.scrollHeight;
-    };
+    // Create output logger
+    const out = log(document.body);   
 
     // Create API client
-    log(actions.connection, 'Connecting to Spotify...');
-    const spotifyApi = new SpotifyWebApi();
-    spotifyApi.setAccessToken(query.get('access_token'));
-
-    // Get user info
+    out.connection('Connecting to Spotify...');
+    const spotifyApi = getApi(token);
     const spotifyUser = await spotifyApi.getMe();
 
     // Get all playlists
-    log(actions.download, 'Fetching all playlists...');
+    out.download('Fetching all playlists...');
     const playlists = new Map<string, PlaylistWithTracks>((await allUserPlaylists(spotifyApi, spotifyUser)).map(playlist => [ playlist.id, { ...playlist, tracks: undefined } ]));
 
     // Track all the playlists that are sources for smart playlists
@@ -172,7 +59,7 @@ const main = async () => {
 
         // Create the smart playlist if needed
         if (!spotifyData.smart) {
-            log(actions.new, `Creating playlist ${smartData.playlist}...`);
+            out.new(`Creating playlist ${smartData.playlist}...`);
             const playlist = await spotifyApi.createPlaylist(spotifyUser.id, { name: smartData.playlist, public: true });
             playlists.set(playlist.id, { ...playlist, tracks: undefined });
             spotifyData.smart = playlist.id;
@@ -181,9 +68,9 @@ const main = async () => {
         // Get the tracks in the automated playlist
         const playlist = playlists.get(spotifyData.smart)!;
         if (playlist.tracks) {
-            log(actions.cache, `Using cached existing tracks for playlist ${smartData.playlist}...`);
+            out.cache(`Using cached existing tracks for playlist ${smartData.playlist}...`);
         } else {
-            log(actions.download, `Fetching existing tracks for playlist ${smartData.playlist}...`);
+            out.download(`Fetching existing tracks for playlist ${smartData.playlist}...`);
             playlist.tracks = await allPlaylistTracks(spotifyApi, spotifyData.smart);
         }
 
@@ -191,9 +78,9 @@ const main = async () => {
         for (const smartSource of spotifyData.sources) {
             const sourcePlaylist = playlists.get(smartSource)!;
             if (sourcePlaylist.tracks) {
-                log(actions.cache, `Using cached source tracks from ${sourcePlaylist.name} for playlist ${smartData.playlist}...`);
+                out.cache(`Using cached source tracks from ${sourcePlaylist.name} for playlist ${smartData.playlist}...`);
             } else {
-                log(actions.download, `Fetching source tracks from ${sourcePlaylist.name} for playlist ${smartData.playlist}...`);
+                out.download(`Fetching source tracks from ${sourcePlaylist.name} for playlist ${smartData.playlist}...`);
                 sourcePlaylist.tracks = await allPlaylistTracks(spotifyApi, smartSource);
             }
         }
@@ -208,29 +95,29 @@ const main = async () => {
         for (const playlistId of sources) {
             const playlist = playlists.get(playlistId);
             if (!playlist || !playlist.tracks) {
-                log(actions.skip, `Skipping album sync for playlist ${playlist?.name || playlistId}... no tracks`);
+                out.skip(`Skipping album sync for playlist ${playlist?.name || playlistId}... no tracks`);
                 continue;
             }
 
             // If the playlist should be ignored, skip
             if (config.sync.ignore.includes(playlist.name)) {
-                log(actions.skip, `Skipping album sync for playlist ${playlist.name}... ignored in config`);
+                out.skip(`Skipping album sync for playlist ${playlist.name}... ignored in config`);
                 continue;
             }
 
             // If the album for all the tracks isn't the same, skip
             const album = 'album' in playlist.tracks[0] && playlist.tracks[0].album;
             if (!album || playlist.tracks.some(track => !('album' in track) || track.album.id !== album.id)) {
-                log(actions.skip, `Skipping album sync for playlist ${playlist.name}... contains multiple albums`);
+                out.skip(`Skipping album sync for playlist ${playlist.name}... contains multiple albums`);
                 continue;
             }
 
             // Get the tracks on the album
             let albumTracks = albums.get(album.id);
             if (albumTracks) {
-                log(actions.cache, `Using cached album tracks from ${album.name} for playlist ${playlist.name}...`);
+                out.cache(`Using cached album tracks from ${album.name} for playlist ${playlist.name}...`);
             } else {
-                log(actions.download, `Fetching album tracks from ${album.name} for playlist ${playlist.name}...`);
+                out.download(`Fetching album tracks from ${album.name} for playlist ${playlist.name}...`);
                 albumTracks = await allAlbumTracks(spotifyApi, album.id);
                 albums.set(album.id, albumTracks);
             }
@@ -248,13 +135,13 @@ const main = async () => {
             if (toAdd.length || toRemove.length) {
                 // Add the tracks
                 if (toAdd.length) {
-                    log(actions.add, `Adding new tracks for playlist ${playlist.name}...`);
+                    out.add(`Adding new tracks for playlist ${playlist.name}...`);
                     await addAllTracks(spotifyApi, playlistId, [ ...new Set(toAdd.map(track => track.uri)) ]);
                 }
 
                 // Remove the tracks
                 if (toRemove.length) {
-                    log(actions.remove, `Removing old tracks from playlist ${playlist.name}...`);
+                    out.remove(`Removing old tracks from playlist ${playlist.name}...`);
                     await removeAllTracks(spotifyApi, playlistId, [ ...new Set(toRemove.map(track => track.uri)) ]);
                 }
 
@@ -265,7 +152,7 @@ const main = async () => {
                 ];
 
                 // Done
-                log(actions.upload, `${playlist.name} updated, now has ${(playlist.tracks.length + toAdd.length - toRemove.length).toLocaleString()} tracks (added ${toAdd.length.toLocaleString()} tracks, removed ${toRemove.length.toLocaleString()} tracks)`);
+                out.upload(`${playlist.name} updated, now has ${(playlist.tracks.length + toAdd.length - toRemove.length).toLocaleString()} tracks (added ${toAdd.length.toLocaleString()} tracks, removed ${toRemove.length.toLocaleString()} tracks)`);
                 changed = true;
             }
 
@@ -291,13 +178,13 @@ const main = async () => {
                 }
 
                 // Done
-                log(actions.upload, `${playlist.name} reordered`);
+                out.upload(`${playlist.name} reordered`);
                 changed = true;
             }
 
             // If we didn't make any changes, log it
             if (!changed) {
-                log(actions.skip, `Skipping album sync for playlist ${playlist.name}... in sync`);
+                out.skip(`Skipping album sync for playlist ${playlist.name}... in sync`);
             }
         }
     }
@@ -306,7 +193,7 @@ const main = async () => {
     for (const smartData of smartPlaylists) {
         const playlist = playlists.get(smartData.spotify.smart);
         if (!playlist || !playlist.tracks) {
-            log(actions.skip, `Skipping smart playlist sync for playlist ${smartData.playlist}... no tracks`);
+            out.skip(`Skipping smart playlist sync for playlist ${smartData.playlist}... no tracks`);
             continue;
         }
 
@@ -322,18 +209,18 @@ const main = async () => {
         if (toAdd.size || toRemove.size) {
             // Add the tracks
             if (toAdd.size) {
-                log(actions.add, `Adding new tracks for playlist ${playlist.name}...`);
+                out.add(`Adding new tracks for playlist ${playlist.name}...`);
                 await addAllTracks(spotifyApi, smartData.spotify.smart, [...toAdd]);
             }
 
             // Remove the tracks
             if (toRemove.size) {
-                log(actions.remove, `Removing old tracks for playlist ${playlist.name}...`);
+                out.remove(`Removing old tracks for playlist ${playlist.name}...`);
                 await removeAllTracks(spotifyApi, smartData.spotify.smart, [...toRemove]);
             }
 
             // Update the playlist
-            log(actions.upload, `Updating description for playlist ${playlist.name}...`);
+            out.upload(`Updating description for playlist ${playlist.name}...`);
             const emojiList = Array.isArray(smartData.emoji)
                 ? smartData.emoji.length === 1
                     ? smartData.emoji[0]
@@ -351,15 +238,15 @@ const main = async () => {
             );
 
             // Done
-            log(actions.upload, `${playlist.name} updated, now has ${(playlist.tracks.length + toAdd.size - toRemove.size).toLocaleString()} tracks (added ${toAdd.size.toLocaleString()} tracks, removed ${toRemove.size.toLocaleString()} tracks)`);
+            out.upload(`${playlist.name} updated, now has ${(playlist.tracks.length + toAdd.size - toRemove.size).toLocaleString()} tracks (added ${toAdd.size.toLocaleString()} tracks, removed ${toRemove.size.toLocaleString()} tracks)`);
         } else {
             // Done
-            log(actions.skip, `Skipping smart playlist sync for playlist ${playlist.name}... in sync`);
+            out.skip(`Skipping smart playlist sync for playlist ${playlist.name}... in sync`);
         }
     }
 
     // Done
-    log(actions.connection, 'Completed');
+    out.connection('Completed');
 };
 
 main().then();
