@@ -73,7 +73,11 @@ const config: SmartConfig = {
         },
         {
             playlist: '🎄 Christmas',
-            emoji: ['🎄', '🔨'],
+            emoji: ['🎄', '🎅🏼', '🔨'],
+        },
+        {
+            playlist: '🎅🏼 Disney Christmas',
+            emoji: ['🎅🏼'],
         },
     ],
     sync: {
