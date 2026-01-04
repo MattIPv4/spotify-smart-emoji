@@ -1,5 +1,5 @@
 import { addAllTracks, allAlbumTracks, allPlaylistTracks, allUserPlaylists, getApi, removeAllTracks } from './api.ts';
-import auth from './auth.ts';
+import { completeAuth, initializeAuth } from './auth.ts';
 import config, { type SmartPlaylist } from './config.ts';
 import log from './log.ts';
 
@@ -15,11 +15,9 @@ interface PlaylistWithTracks extends Omit<SpotifyApi.PlaylistObjectSimplified, '
 }
 
 const main = async () => {
-    const query = new URLSearchParams(window.location.hash.slice(1));
-
-    // If no access token present, auth
-    const token = query.get('access_token');
-    if (!token) return window.location.href = auth();
+    // Attempt to complete auth, or initialize if we cannot
+    const token = await completeAuth();
+    if (!token) return await initializeAuth();
 
     // Create output logger
     const out = log(document.body);   
